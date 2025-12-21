@@ -3,7 +3,8 @@
 import fs from "node:fs";
 import fsp from "node:fs/promises";
 import path from "node:path";
-import { get_encoding, Tiktoken } from "@dqbd/tiktoken";
+import { Tiktoken } from "js-tiktoken";
+import cl100k_base from "js-tiktoken/ranks/cl100k_base";
 
 import { Tool, ToolResult } from "./base";
 
@@ -27,43 +28,39 @@ export function truncateTextByTokens(text: string, maxTokens: number): string {
    *     >>> truncated = truncate_text_by_tokens(text, 64000)
    *     >>> print(truncated)
    */
-  const encoding: Tiktoken = get_encoding("cl100k_base");
+  const enc = new Tiktoken(cl100k_base);
 
-  try {
-    const tokenCount = encoding.encode(text).length;
+  const tokenCount = enc.encode(text).length;
 
-    // Return original text if under limit
-    if (tokenCount <= maxTokens) {
-      return text;
-    }
-
-    // Calculate token/character ratio for approximation
-    const charCount = text.length || 1;
-    const ratio = tokenCount / charCount;
-
-    // Keep head and tail mode: allocate half space for each (with 5% safety margin)
-    const charsPerHalf = Math.floor((maxTokens / 2 / ratio) * 0.95);
-
-    // Truncate front part: find nearest newline
-    let headPart = text.slice(0, charsPerHalf);
-    const lastNewlineHead = headPart.lastIndexOf("\n");
-    if (lastNewlineHead > 0) {
-      headPart = headPart.slice(0, lastNewlineHead);
-    }
-
-    // Truncate back part: find nearest newline
-    let tailPart = text.slice(-charsPerHalf);
-    const firstNewlineTail = tailPart.indexOf("\n");
-    if (firstNewlineTail > 0) {
-      tailPart = tailPart.slice(firstNewlineTail + 1);
-    }
-
-    // Combine result
-    const truncationNote = `\n\n... [Content truncated: ${tokenCount} tokens -> ~${maxTokens} tokens limit] ...\n\n`;
-    return headPart + truncationNote + tailPart;
-  } finally {
-    encoding.free();
+  // Return original text if under limit
+  if (tokenCount <= maxTokens) {
+    return text;
   }
+
+  // Calculate token/character ratio for approximation
+  const charCount = text.length || 1;
+  const ratio = tokenCount / charCount;
+
+  // Keep head and tail mode: allocate half space for each (with 5% safety margin)
+  const charsPerHalf = Math.floor((maxTokens / 2 / ratio) * 0.95);
+
+  // Truncate front part: find nearest newline
+  let headPart = text.slice(0, charsPerHalf);
+  const lastNewlineHead = headPart.lastIndexOf("\n");
+  if (lastNewlineHead > 0) {
+    headPart = headPart.slice(0, lastNewlineHead);
+  }
+
+  // Truncate back part: find nearest newline
+  let tailPart = text.slice(-charsPerHalf);
+  const firstNewlineTail = tailPart.indexOf("\n");
+  if (firstNewlineTail > 0) {
+    tailPart = tailPart.slice(firstNewlineTail + 1);
+  }
+
+  // Combine result
+  const truncationNote = `\n\n... [Content truncated: ${tokenCount} tokens -> ~${maxTokens} tokens limit] ...\n\n`;
+  return headPart + truncationNote + tailPart;
 }
 
 export class ReadTool extends Tool {

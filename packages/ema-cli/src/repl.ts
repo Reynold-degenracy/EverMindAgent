@@ -1,9 +1,76 @@
 import readline from "node:readline/promises";
 import { stdin as input, stdout as output } from "node:process";
+import { Command } from "clipanion";
 
-import { Agent, AgentEvents } from "./agent";
-import { Config } from "./config";
-import type { Tool } from "./tools/base";
+import { Agent, AgentEvents, Config } from "ema";
+import type { Tool } from "ema";
+
+/**
+ * Start a REPL session with the EMA agent
+ */
+export class ReplCommand extends Command {
+  static paths = [[`repl`]];
+
+  static usage = Command.Usage({
+    description: "Start a REPL session with the EMA agent",
+    details: "Start a REPL session with the EMA agent.",
+    examples: [["Start a REPL session with the EMA agent", "ema repl"]],
+  });
+
+  async execute() {
+    // Load configuration (uses built-in search order).
+    const config = Config.load();
+
+    // Resolve system prompt (fallback to a simple default when missing).
+    const systemPrompt =
+      "你的名字是ema，一个由EmaFanClub开发的智能助手。请简洁且有礼貌地回答用户的问题。";
+
+    // No tools by default; plug real Tool instances here when needed.
+    const tools: Tool[] = [];
+
+    // Create agent with config values.
+    const agent = new Agent(config, systemPrompt, tools);
+    attachEventLogging(agent);
+
+    // Simple REPL loop.
+    const rl = readline.createInterface({ input, output });
+    rl.on("SIGINT", () => {
+      console.log(`\n${Colors.DIM}Exiting...${Colors.RESET}`);
+      rl.close();
+      process.exit(0);
+    });
+    console.log(
+      `${Colors.BOLD}${Colors.CYAN}Type your message, or /exit to quit. Commands: /history, /clear${Colors.RESET}`,
+    );
+
+    while (true) {
+      console.log(`${Colors.DIM}${"─".repeat(64)}${Colors.RESET}`);
+      const userInput = (await rl.question("YOU > ")).trim();
+      if (!userInput) {
+        continue;
+      }
+      if (userInput === "/exit" || userInput === "/quit") {
+        break;
+      }
+      if (userInput === "/clear") {
+        console.clear();
+        continue;
+      }
+      if (userInput === "/history") {
+        for (const msg of agent.contextManager.getHistory()) {
+          console.log(
+            `${Colors.DIM}${msg.role.toUpperCase()}${Colors.RESET} ${formatJson(msg.content)}`,
+          );
+        }
+        continue;
+      }
+      agent.contextManager.addUserMessage(userInput);
+      await agent.run();
+    }
+
+    rl.close();
+  }
+}
 
 /** ANSI color helpers for a slightly nicer CLI. */
 class Colors {
@@ -24,61 +91,6 @@ function formatJson(value: unknown): string {
   } catch {
     return String(value);
   }
-}
-
-/** Minimal interactive runner for the TypeScript Agent. */
-async function main(): Promise<void> {
-  // Load configuration (uses built-in search order).
-  const config = Config.load();
-
-  // Resolve system prompt (fallback to a simple default when missing).
-  const systemPrompt =
-    "你的名字是ema，一个由EmaFanClub开发的智能助手。请简洁且有礼貌地回答用户的问题。";
-
-  // No tools by default; plug real Tool instances here when needed.
-  const tools: Tool[] = [];
-
-  // Create agent with config values.
-  const agent = new Agent(config, systemPrompt, tools);
-  attachEventLogging(agent);
-
-  // Simple REPL loop.
-  const rl = readline.createInterface({ input, output });
-  rl.on("SIGINT", () => {
-    console.log(`\n${Colors.DIM}Exiting...${Colors.RESET}`);
-    rl.close();
-    process.exit(0);
-  });
-  console.log(
-    `${Colors.BOLD}${Colors.CYAN}Type your message, or /exit to quit. Commands: /history, /clear${Colors.RESET}`,
-  );
-
-  while (true) {
-    console.log(`${Colors.DIM}${"─".repeat(64)}${Colors.RESET}`);
-    const userInput = (await rl.question("YOU > ")).trim();
-    if (!userInput) {
-      continue;
-    }
-    if (userInput === "/exit" || userInput === "/quit") {
-      break;
-    }
-    if (userInput === "/clear") {
-      console.clear();
-      continue;
-    }
-    if (userInput === "/history") {
-      for (const msg of agent.contextManager.getHistory()) {
-        console.log(
-          `${Colors.DIM}${msg.role.toUpperCase()}${Colors.RESET} ${formatJson(msg.content)}`,
-        );
-      }
-      continue;
-    }
-    agent.contextManager.addUserMessage(userInput);
-    await agent.run();
-  }
-
-  rl.close();
 }
 
 function attachEventLogging(agent: Agent): void {
@@ -174,8 +186,3 @@ function attachEventLogging(agent: Agent): void {
     }
   });
 }
-
-main().catch((err) => {
-  console.error("Fatal error in run_agent:", err);
-  process.exit(1);
-});

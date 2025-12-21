@@ -27,6 +27,7 @@
     "types"
   ],
   "dependencies": {
+    "js-tiktoken": "^1.0.21",
     "string-width": "^7.2.0",
     "@modelcontextprotocol/sdk": "^1.25.1",
     "mongodb": "^7.0.0",

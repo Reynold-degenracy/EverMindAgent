@@ -7,6 +7,7 @@
   "main": "index.js",
   "scripts": {
     "start": "pnpm --filter ema-ui start",
+    "cli": "exec tsx packages/ema-cli/src/main.ts",
     "dev": "pnpm --filter ema-ui dev",
     "test": "pnpm test:main run",
     "test:watch": "pnpm test:main",
@@ -19,7 +20,6 @@
   "keywords": [],
   "packageManager": "pnpm@10.16.1",
   "devDependencies": {
-    "@dqbd/tiktoken": "^1.0.15",
     "@modelcontextprotocol/sdk": "^1.0.0",
     "@types/js-yaml": "^4.0.9",
     "@types/node": "^20.11.17",

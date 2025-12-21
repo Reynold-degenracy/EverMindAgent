@@ -2,7 +2,8 @@ import fs from "node:fs";
 import path from "node:path";
 import { EventEmitter } from "node:events";
 
-import { get_encoding, Tiktoken } from "@dqbd/tiktoken";
+import { Tiktoken } from "js-tiktoken";
+import cl100k_base from "js-tiktoken/ranks/cl100k_base";
 
 import type { LLMClientBase } from "./llm/base";
 import { OpenAIClient } from "./llm/openai_client";
@@ -238,29 +239,28 @@ export class ContextManager {
 
   /** Accurately calculate token count for message history using tiktoken. */
   estimateTokens(): number {
-    let encoding: Tiktoken | undefined;
+    const enc = new Tiktoken(cl100k_base);
     try {
-      encoding = get_encoding("cl100k_base");
       let totalTokens = 0;
 
       for (const msg of this.messages) {
         const content = msg.content;
         if (typeof content === "string") {
-          totalTokens += encoding.encode(content).length;
+          totalTokens += enc.encode(content).length;
         } else if (Array.isArray(content)) {
           for (const block of content as unknown[]) {
             if (typeof block === "object" && block !== null) {
-              totalTokens += encoding.encode(JSON.stringify(block)).length;
+              totalTokens += enc.encode(JSON.stringify(block)).length;
             }
           }
         }
 
         if (msg.thinking) {
-          totalTokens += encoding.encode(msg.thinking).length;
+          totalTokens += enc.encode(msg.thinking).length;
         }
 
         if (msg.tool_calls) {
-          totalTokens += encoding.encode(JSON.stringify(msg.tool_calls)).length;
+          totalTokens += enc.encode(JSON.stringify(msg.tool_calls)).length;
         }
 
         // Metadata overhead per message (approximately 4 tokens)
@@ -276,8 +276,6 @@ export class ContextManager {
         error: error as Error,
       });
       return this.estimateTokensFallback();
-    } finally {
-      encoding?.free();
     }
   }
 
