@@ -2,6 +2,9 @@ import type {
   LongTermMemoryDB,
   LongTermMemoryEntity,
   ListLongTermMemoriesRequest,
+  LongTermMemorySearcher,
+  CreatedField,
+  SearchLongTermMemoriesRequest,
 } from "./base";
 import type { Mongo } from "./mongo";
 import { upsertEntity, deleteEntity, omitMongoId } from "./mongo.util";
@@ -79,4 +82,48 @@ export class MongoLongTermMemoryDB implements LongTermMemoryDB {
   async deleteLongTermMemory(id: number): Promise<boolean> {
     return deleteEntity(this.mongo, this.$cn, id);
   }
+}
+
+export class MongoLongTermMemorySearcher implements LongTermMemorySearcher {
+  private readonly mongo: Mongo;
+  /** collection name */
+  private readonly $cn = "long_term_memories";
+  /**
+   * The collection names being accessed
+   */
+  collections: string[] = [this.$cn];
+
+  constructor(mongo: Mongo) {
+    this.mongo = mongo;
+  }
+
+  // todo: fuzzy search
+  async searchLongTermMemories(
+    req: SearchLongTermMemoriesRequest,
+  ): Promise<(LongTermMemoryEntity & CreatedField)[]> {
+    const db = this.mongo.getDb();
+    const collection = db.collection<LongTermMemoryEntity>(this.$cn);
+
+    const filter: any = {};
+    if (req.actorId) {
+      filter.actorId = req.actorId;
+    }
+    if (req.index0) {
+      filter.index0 = req.index0;
+    }
+    if (req.index1) {
+      filter.index1 = req.index1;
+    }
+    if (req.keywords) {
+      filter.keywords = req.keywords;
+    }
+    return (await collection.find(filter).toArray()).map(withCreatedField);
+  }
+}
+
+function withCreatedField<T extends object>(entity: T): T & CreatedField {
+  if ("createdAt" in entity && entity.createdAt !== undefined) {
+    return entity as T & CreatedField;
+  }
+  throw new Error("createdAt is required");
 }

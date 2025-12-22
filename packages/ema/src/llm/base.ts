@@ -15,7 +15,7 @@ export type Tool = any;
  * This class defines the interface that all LLM clients must implement,
  * regardless of the underlying API protocol (Anthropic, OpenAI, etc.).
  */
-export abstract class LLMClientBase {
+export abstract class LLMClient {
   retryCallback: ((exception: Error, attempt: number) => void) | undefined =
     undefined;
 

@@ -12,6 +12,7 @@ import { fileURLToPath } from "node:url";
 import yaml from "js-yaml";
 
 import { RetryConfig } from "./retry";
+import type { Tool } from "./tools/base";
 
 export class MongoConfig {
   /** MongoDB configuration */
@@ -92,16 +93,19 @@ export class AgentConfig {
 
   maxSteps: number;
   workspaceDir: string;
-  systemPromptPath: string;
+  systemPromptFile: string;
+  tokenLimit: number;
 
   constructor({
     maxSteps = 50,
     workspaceDir = "./workspace",
-    systemPromptPath = "system_prompt.md",
+    systemPromptFile = "system_prompt.md",
+    tokenLimit = 80000,
   }: Partial<AgentConfig> = {}) {
     this.maxSteps = maxSteps;
     this.workspaceDir = workspaceDir;
-    this.systemPromptPath = systemPromptPath;
+    this.systemPromptFile = systemPromptFile;
+    this.tokenLimit = tokenLimit;
   }
 }
 
@@ -174,8 +178,10 @@ export class Config {
    */
   static load(): Config {
     const configPath = this.getDefaultConfigPath();
-    if (configPath && fs.existsSync(configPath)) {
-      return this.fromYaml(configPath);
+    if (!fs.existsSync(configPath)) {
+      const defaultContent = this.getDefaultConfigContent();
+      fs.mkdirSync(path.dirname(configPath), { recursive: true });
+      fs.writeFileSync(configPath, defaultContent, "utf-8");
     }
     // Fallback to defaults (which use environment variables)
     return new Config({
@@ -235,7 +241,8 @@ export class Config {
     const agentConfig = new AgentConfig({
       maxSteps: data.max_steps,
       workspaceDir: data.workspace_dir,
-      systemPromptPath: data.system_prompt_path,
+      systemPromptFile: data.system_prompt_file,
+      tokenLimit: data.token_limit,
     });
 
     // Parse tools configuration
@@ -274,6 +281,21 @@ export class Config {
     });
   }
 
+  get systemPrompt(): string {
+    const path = Config.findConfigFile(this.agent.systemPromptFile);
+    if (!path) {
+      throw new Error(
+        `System prompt file not found: ${this.agent.systemPromptFile}`,
+      );
+    }
+    return fs.readFileSync(path, "utf-8");
+  }
+
+  // TODO: populate with concrete tool instances when tool wiring is ready.
+  get baseTools(): Tool[] {
+    return [];
+  }
+
   /**
    * Get the package installation directory
    *
@@ -295,15 +317,8 @@ export class Config {
    * @returns Path to found config file, or null if not found
    */
   static findConfigFile(filename: string): string | null {
-    // Priority 1: Development mode - current directory's config/ subdirectory
-    const devConfig = path.join(
-      process.cwd(),
-      "packages",
-      "ema",
-      "src",
-      "config",
-      filename,
-    );
+    // Priority 1: Development mode - config/ under package source (stable regardless of cwd)
+    const devConfig = path.join(this.getPackageDir(), "config", filename);
     if (fs.existsSync(devConfig)) {
       return devConfig;
     }
@@ -312,12 +327,6 @@ export class Config {
     const userConfig = path.join(os.homedir(), ".ema", "config", filename);
     if (fs.existsSync(userConfig)) {
       return userConfig;
-    }
-
-    // Priority 3: Package installation directory's config/ subdirectory
-    const packageConfig = path.join(this.getPackageDir(), "config", filename);
-    if (fs.existsSync(packageConfig)) {
-      return packageConfig;
     }
 
     return null;
@@ -336,5 +345,34 @@ export class Config {
 
     // Fallback to package config directory for error message purposes
     return path.join(this.getPackageDir(), "config", "config.yaml");
+  }
+
+  private static getDefaultConfigContent(): string {
+    return yaml.dump({
+      api_key: "YOUR_API_KEY_HERE",
+      api_base: "https://generativelanguage.googleapis.com/v1beta/openai/",
+      model: "gemini-2.5-flash",
+      provider: "openai",
+      retry: {
+        enabled: true,
+        max_retries: 3,
+        initial_delay: 1000,
+        max_delay: 10000,
+        exponential_base: 2,
+      },
+      max_steps: 50,
+      workspace_dir: "./workspace",
+      system_prompt_file: "system_prompt.md",
+      token_limit: 80000,
+      tools: {
+        enable_file_tools: true,
+        enable_bash: true,
+        enable_note: true,
+        enable_skills: true,
+        skills_dir: "./skills",
+        enable_mcp: true,
+        mcp_config_path: "mcp.json",
+      },
+    });
   }
 }

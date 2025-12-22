@@ -3,7 +3,7 @@
  */
 
 import type { Tool } from "./base";
-import { LLMClientBase } from "./base";
+import { LLMClient } from "./base";
 import { RetryConfig, wrapWithRetry } from "../retry";
 import type { Message, LLMResponse } from "../schema";
 import { OpenAI } from "openai";
@@ -18,7 +18,7 @@ import { ProxyAgent, fetch } from "undici";
  * - Tool calling
  * - Retry logic
  */
-export class OpenAIClient extends LLMClientBase {
+export class OpenAIClient extends LLMClient {
   private readonly client: OpenAI;
 
   constructor(

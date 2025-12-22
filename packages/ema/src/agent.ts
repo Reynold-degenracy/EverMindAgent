@@ -5,9 +5,8 @@ import { EventEmitter } from "node:events";
 import { Tiktoken } from "js-tiktoken";
 import cl100k_base from "js-tiktoken/ranks/cl100k_base";
 
-import type { LLMClientBase } from "./llm/base";
-import { OpenAIClient } from "./llm/openai_client";
-import { Config } from "./config";
+import type { LLMClient } from "./llm/base";
+import { AgentConfig } from "./config";
 import { AgentLogger } from "./logger";
 import { RetryExhaustedError } from "./retry";
 import type { LLMResponse, Message } from "./schema";
@@ -73,37 +72,44 @@ const AgentEventDefs = {
   },
 } as const;
 
-type AgentEventNames = keyof typeof AgentEventDefs;
+export type AgentEventName = keyof typeof AgentEventDefs;
+
+export type AgentEventContents = {
+  [K in AgentEventName]: (typeof AgentEventDefs)[K];
+};
+
+export type AgentEventContent<K extends AgentEventName = AgentEventName> =
+  (typeof AgentEventDefs)[K];
 
 export class AgentEventsEmitter {
   private readonly emitter = new EventEmitter();
 
-  emit<K extends AgentEventNames>(
+  emit<K extends AgentEventName>(
     event: K,
-    payload: (typeof AgentEventDefs)[K],
+    content: AgentEventContent<K>,
   ): boolean {
-    return this.emitter.emit(event, payload);
+    return this.emitter.emit(event, content);
   }
 
-  on<K extends AgentEventNames>(
+  on<K extends AgentEventName>(
     event: K,
-    handler: (payload: (typeof AgentEventDefs)[K]) => void,
+    handler: (content: AgentEventContent<K>) => void,
   ): AgentEventsEmitter {
     this.emitter.on(event, handler);
     return this;
   }
 
-  off<K extends AgentEventNames>(
+  off<K extends AgentEventName>(
     event: K,
-    handler: (payload: (typeof AgentEventDefs)[K]) => void,
+    handler: (content: AgentEventContent<K>) => void,
   ): AgentEventsEmitter {
     this.emitter.off(event, handler);
     return this;
   }
 
-  once<K extends AgentEventNames>(
+  once<K extends AgentEventName>(
     event: K,
-    handler: (payload: (typeof AgentEventDefs)[K]) => void,
+    handler: (content: AgentEventContent<K>) => void,
   ): AgentEventsEmitter {
     this.emitter.once(event, handler);
     return this;
@@ -112,7 +118,7 @@ export class AgentEventsEmitter {
 
 export const AgentEvents = Object.fromEntries(
   Object.keys(AgentEventDefs).map((key) => [key, key]),
-) as { [K in keyof typeof AgentEventDefs]: K };
+) as { [K in AgentEventName]: K };
 
 // /** ANSI color codes for terminal output. */
 // class Colors {
@@ -152,7 +158,7 @@ export interface Context {
 
 /** Manages conversation context and message history for the agent. */
 export class ContextManager {
-  llmClient: LLMClientBase;
+  llmClient: LLMClient;
   workspaceDir: string;
   systemPrompt: string;
   tokenLimit: number;
@@ -165,7 +171,7 @@ export class ContextManager {
 
   constructor(
     systemPrompt: string,
-    llmClient: LLMClientBase,
+    llmClient: LLMClient,
     tools: Tool[],
     workspaceDir: string,
     tokenLimit: number = 80000,
@@ -514,41 +520,28 @@ export class ContextManager {
 
 /** Single agent with basic tools and MCP support. */
 export class Agent {
-  /** LLM client used by the agent to generate responses. */
-  llm: LLMClientBase;
-  /** Configuration for the agent and underlying LLM. */
-  config: Config;
   /** Event emitter for agent lifecycle notifications. */
-  events: AgentEventsEmitter;
+  events: AgentEventsEmitter = new AgentEventsEmitter();
   /** Manages conversation context, history, and available tools. */
   contextManager: ContextManager;
   /** Logger instance used for agent-related logging. */
   logger: AgentLogger;
 
   constructor(
-    config: Config,
+    /** Configuration for the agent. */
+    private config: AgentConfig,
+    /** LLM client used by the agent to generate responses. */
+    private llm: LLMClient,
     systemPrompt: string,
     tools: Tool[],
-    tokenLimit: number = 80000,
   ) {
-    this.config = config;
-    this.events = new AgentEventsEmitter();
-
-    this.llm = new OpenAIClient(
-      this.config.llm.apiKey,
-      this.config.llm.apiBase,
-      this.config.llm.model,
-      this.config.llm.retry,
-      this.config.system.httpsProxy,
-    );
-
     // Initialize context manager with tools
     this.contextManager = new ContextManager(
       systemPrompt,
-      this.llm,
+      llm,
       tools,
-      this.config.agent.workspaceDir,
-      tokenLimit,
+      this.config.workspaceDir,
+      this.config.tokenLimit,
       this.events,
     );
 
@@ -564,7 +557,7 @@ export class Agent {
     //   `${Colors.DIM}📝 Log file: ${this.logger.getLogFilePath()}${Colors.RESET}`,
     // );
 
-    const maxSteps = this.config.agent.maxSteps;
+    const maxSteps = this.config.maxSteps;
     let step = 0;
 
     while (step < maxSteps) {

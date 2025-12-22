@@ -72,6 +72,13 @@ export interface RoleEntity extends Entity {
   updatedAt?: DbDate;
 }
 
+export interface CreatedField {
+  /**
+   * The date and time the entity was created
+   */
+  createdAt: DbDate;
+}
+
 /**
  * Interface for role database operations
  */
@@ -400,7 +407,7 @@ export interface ShortTermMemoryEntity extends Entity {
   /**
    * The messages ids facilitating the short term memory, for debugging purpose.
    */
-  messages: number[];
+  messages?: number[];
 }
 
 /**
@@ -474,7 +481,7 @@ export interface LongTermMemoryEntity extends Entity {
   /**
    * The messages ids facilitating the long term memory, for debugging purpose.
    */
-  messages: number[];
+  messages?: number[];
 }
 
 /**
@@ -528,7 +535,7 @@ export interface LongTermMemorySearcher {
    */
   searchLongTermMemories(
     req: SearchLongTermMemoriesRequest,
-  ): Promise<LongTermMemoryEntity[]>;
+  ): Promise<(LongTermMemoryEntity & CreatedField)[]>;
 }
 
 export interface SearchLongTermMemoriesRequest {
@@ -539,11 +546,11 @@ export interface SearchLongTermMemoriesRequest {
   /**
    * The 0-index to search, a.k.a. 一级分类
    */
-  index0: string;
+  index0?: string;
   /**
    * The 1-index to search, a.k.a. 二级分类
    */
-  index1: string;
+  index1?: string;
   /**
    * The keywords to search
    */

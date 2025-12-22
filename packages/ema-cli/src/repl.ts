@@ -2,7 +2,7 @@ import readline from "node:readline/promises";
 import { stdin as input, stdout as output } from "node:process";
 import { Command } from "clipanion";
 
-import { Agent, AgentEvents, Config } from "ema";
+import { Agent, AgentEvents, Config, OpenAIClient } from "ema";
 import type { Tool } from "ema";
 
 /**
@@ -28,8 +28,15 @@ export class ReplCommand extends Command {
     // No tools by default; plug real Tool instances here when needed.
     const tools: Tool[] = [];
 
+    const llm = new OpenAIClient(
+      config.llm.apiKey,
+      config.llm.apiBase,
+      config.llm.model,
+      config.llm.retry,
+    );
+
     // Create agent with config values.
-    const agent = new Agent(config, systemPrompt, tools);
+    const agent = new Agent(config.agent, llm, systemPrompt, tools);
     attachEventLogging(agent);
 
     // Simple REPL loop.
