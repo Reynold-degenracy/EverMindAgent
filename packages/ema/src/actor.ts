@@ -44,7 +44,7 @@ export class ActorWorker implements ActorStateStorage, ActorMemory {
     /** The searcher of the long-term memory. */
     private readonly longTermMemorySearcher: LongTermMemorySearcher,
   ) {
-    const llm = new LLMClient(this.config.llm);
+    const llm = new LLMClient(this.config.llm, this.config.system);
     this.agent = new Agent(
       config.agent,
       llm,

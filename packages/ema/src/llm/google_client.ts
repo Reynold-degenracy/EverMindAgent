@@ -7,6 +7,7 @@ import {
 } from "../schema";
 import { GoogleGenAI } from "@google/genai";
 import { type GoogleGenAIOptions, ThinkingLevel } from "@google/genai";
+import { ProxyAgent } from "undici";
 import type { Tool } from "../tools/base";
 import { wrapWithRetry } from "../retry";
 import type {
@@ -34,6 +35,15 @@ export class GoogleClient extends LLMClientBase implements SchemaAdapter {
         baseUrl: config.base_url,
       },
     };
+
+    // Configure proxy if provided
+    const proxyUrl = config.https_proxy || config.http_proxy;
+    if (proxyUrl && options.httpOptions) {
+      // Pass the dispatcher for Node.js fetch to use the proxy
+      // TypeScript doesn't recognize this property, so we use type assertion
+      (options.httpOptions as any).dispatcher = new ProxyAgent(proxyUrl);
+    }
+
     this.client = new GoogleGenAI(options);
   }
 
