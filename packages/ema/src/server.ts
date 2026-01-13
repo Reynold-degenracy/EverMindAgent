@@ -62,7 +62,7 @@ export class Server {
     config: Config,
   ) {
     this.config = config;
-    this.llmClient = new LLMClient(config.llm);
+    this.llmClient = new LLMClient(config.llm, config.system);
   }
 
   static async create(

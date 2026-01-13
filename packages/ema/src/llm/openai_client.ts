@@ -1,5 +1,6 @@
 import OpenAI from "openai";
 import type { ClientOptions } from "openai";
+import { ProxyAgent } from "undici";
 import { LLMClientBase } from "./base";
 import {
   type SchemaAdapter,
@@ -32,6 +33,16 @@ export class OpenAIClient extends LLMClientBase implements SchemaAdapter {
       apiKey: config.key,
       baseURL: config.base_url,
     };
+
+    // Configure proxy if provided
+    const proxyUrl = config.https_proxy || config.http_proxy;
+    if (proxyUrl) {
+      // Use fetchOptions to pass the undici dispatcher for proxy support
+      options.fetchOptions = {
+        dispatcher: new ProxyAgent(proxyUrl),
+      } as any;
+    }
+
     this.client = new OpenAI(options);
   }
 

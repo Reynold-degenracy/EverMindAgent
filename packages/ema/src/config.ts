@@ -72,6 +72,13 @@ export class SystemConfig {
      */
     public readonly data_root: string = ".data",
     /**
+     * The HTTP proxy.
+     *
+     * If environment variable `HTTP_PROXY` or `http_proxy` is set, it will be used first.
+     * If it is empty, no proxy will be used.
+     */
+    public http_proxy: string = "",
+    /**
      * The HTTPS proxy.
      *
      * If environment variable `HTTPS_PROXY` or `https_proxy` is set, it will be used first.
@@ -93,6 +100,14 @@ export interface LLMApiConfig {
    * Base URL for the LLM provider.
    */
   base_url: string;
+  /**
+   * HTTP proxy URL.
+   */
+  http_proxy?: string;
+  /**
+   * HTTPS proxy URL.
+   */
+  https_proxy?: string;
 }
 
 /**
@@ -369,6 +384,11 @@ export class Config {
     }
     if (process.env.GEMINI_API_BASE) {
       this.llm.google.base_url = process.env.GEMINI_API_BASE;
+    }
+    if (process.env.HTTP_PROXY) {
+      this.system.http_proxy = process.env.HTTP_PROXY;
+    } else if (process.env.http_proxy) {
+      this.system.http_proxy = process.env.http_proxy;
     }
     if (process.env.HTTPS_PROXY) {
       this.system.https_proxy = process.env.HTTPS_PROXY;

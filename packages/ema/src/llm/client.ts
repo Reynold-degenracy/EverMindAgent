@@ -1,5 +1,5 @@
 import type { LLMClientBase } from "./base";
-import { LLMConfig } from "../config";
+import { LLMConfig, type SystemConfig } from "../config";
 import { GoogleClient } from "./google_client";
 import { OpenAIClient } from "./openai_client";
 import type { LLMResponse } from "../schema";
@@ -16,7 +16,10 @@ export enum LLMProvider {
 export class LLMClient {
   private readonly client: LLMClientBase;
 
-  constructor(readonly config: LLMConfig) {
+  constructor(
+    readonly config: LLMConfig,
+    readonly systemConfig?: SystemConfig,
+  ) {
     if (!this.config.chat_provider) {
       throw new Error("Missing LLM provider.");
     }
@@ -27,7 +30,11 @@ export class LLMClient {
         }
         this.client = new GoogleClient(
           this.config.chat_model,
-          this.config.google,
+          {
+            ...this.config.google,
+            http_proxy: systemConfig?.http_proxy,
+            https_proxy: systemConfig?.https_proxy,
+          },
           this.config.retry,
         );
         break;
@@ -37,7 +44,11 @@ export class LLMClient {
         }
         this.client = new OpenAIClient(
           this.config.chat_model,
-          this.config.openai,
+          {
+            ...this.config.openai,
+            http_proxy: systemConfig?.http_proxy,
+            https_proxy: systemConfig?.https_proxy,
+          },
           this.config.retry,
         );
         break;
